@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "saga-pattern.fullname" . }}-order
+  labels:
+    {{- include "saga-pattern.labels" . | nindent 4 }}
+    app.kubernetes.io/component: order
+spec:
+  replicas: {{ .Values.replicas.order }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: order
+  template:
+    metadata:
+      labels:
+        {{- include "saga-pattern.labels" . | nindent 8 }}
+        app.kubernetes.io/component: order
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      initContainers:
+        - name: wait-kafka
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              BROKER="$(echo "$KAFKA_BROKERS" | cut -d, -f1)"
+              HOST="$(echo "$BROKER" | cut -d: -f1)"
+              PORT="$(echo "$BROKER" | cut -d: -f2)"
+              echo "Waiting for Kafka at $HOST:$PORT";
+              until nc -z "$HOST" "$PORT"; do sleep 2; done
+          envFrom:
+            - configMapRef:
+                name: {{ include "saga-pattern.fullname" . }}-config
+        - name: wait-db
+          image: postgres:15-alpine
+          command: ["sh","-c","until pg_isready -d \"$DATABASE_URL\"; do echo waiting for db; sleep 2; done"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "saga-pattern.fullname" . }}-secrets
+                  key: ORDERS_DATABASE_URL
+      containers:
+        - name: order
+          image: "{{ .Values.images.order.repository }}:{{ .Values.images.order.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: {{ include "saga-pattern.fullname" . }}-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "saga-pattern.fullname" . }}-secrets
+                  key: ORDERS_DATABASE_URL
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "saga-pattern.fullname" . }}-order
+  labels:
+    {{- include "saga-pattern.labels" . | nindent 4 }}
+    app.kubernetes.io/component: order
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: order
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

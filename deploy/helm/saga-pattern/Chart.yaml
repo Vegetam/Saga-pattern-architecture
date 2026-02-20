@@ -1,0 +1,6 @@
+apiVersion: v2
+name: saga-pattern
+description: Saga pattern demo (orchestrator + services) — Kubernetes-ready example
+type: application
+version: 0.1.0
+appVersion: 1.0.0

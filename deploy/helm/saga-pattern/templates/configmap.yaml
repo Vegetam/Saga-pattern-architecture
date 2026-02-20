@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "saga-pattern.fullname" . }}-config
+  labels:
+    {{- include "saga-pattern.labels" . | nindent 4 }}
+data:
+  KAFKA_BROKERS: {{ .Values.config.kafkaBrokers | quote }}
+  SAGA_STATE_STORE: {{ .Values.config.sagaStateStore | quote }}
+  TYPEORM_SYNCHRONIZE: {{ .Values.config.typeorm.synchronize | quote }}
+  TYPEORM_LOGGING: {{ .Values.config.typeorm.logging | quote }}
+  NODE_ENV: "production"

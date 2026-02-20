@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "saga-pattern.fullname" . }}-notification
+  labels:
+    {{- include "saga-pattern.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notification
+spec:
+  replicas: {{ .Values.replicas.notification }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: notification
+  template:
+    metadata:
+      labels:
+        {{- include "saga-pattern.labels" . | nindent 8 }}
+        app.kubernetes.io/component: notification
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      initContainers:
+        - name: wait-kafka
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              BROKER="$(echo "$KAFKA_BROKERS" | cut -d, -f1)"
+              HOST="$(echo "$BROKER" | cut -d: -f1)"
+              PORT="$(echo "$BROKER" | cut -d: -f2)"
+              echo "Waiting for Kafka at $HOST:$PORT";
+              until nc -z "$HOST" "$PORT"; do sleep 2; done
+          envFrom:
+            - configMapRef:
+                name: {{ include "saga-pattern.fullname" . }}-config
+      containers:
+        - name: notification
+          image: "{{ .Values.images.notification.repository }}:{{ .Values.images.notification.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: {{ include "saga-pattern.fullname" . }}-config
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "saga-pattern.fullname" . }}-notification
+  labels:
+    {{- include "saga-pattern.labels" . | nindent 4 }}
+    app.kubernetes.io/component: notification
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: notification
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

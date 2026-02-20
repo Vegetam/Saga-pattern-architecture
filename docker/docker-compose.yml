@@ -1,0 +1,163 @@
+version: '3.9'
+
+services:
+  # ─── Infrastructure ───────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on: [zookeeper]
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Two listeners:
+      #  - PLAINTEXT: used by other Docker services on the compose network
+      #  - PLAINTEXT_HOST: used by clients running on your host machine
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      retries: 5
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    depends_on: [kafka]
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+
+  postgres-saga:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: saga_db
+      POSTGRES_USER: saga_user
+      POSTGRES_PASSWORD: saga_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - saga_postgres_data:/var/lib/postgresql/data
+
+  postgres-orders:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: orders_db
+      POSTGRES_USER: orders_user
+      POSTGRES_PASSWORD: orders_pass
+    ports:
+      - "5433:5432"
+
+  postgres-payments:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: payments_db
+      POSTGRES_USER: payments_user
+      POSTGRES_PASSWORD: payments_pass
+    ports:
+      - "5434:5432"
+
+  postgres-inventory:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: inventory_db
+      POSTGRES_USER: inventory_user
+      POSTGRES_PASSWORD: inventory_pass
+    ports:
+      - "5435:5432"
+
+  # ─── Observability ────────────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    ports:
+      - "16686:16686"  # UI
+      - "6831:6831/udp"  # Thrift
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on: [prometheus]
+
+  # ─── Services ─────────────────────────────────────────────────────
+  saga-orchestrator:
+    build: ../saga-orchestrator
+    ports:
+      - "3000:3000"
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      # Default: Redis for distributed locks/state (set SAGA_STATE_STORE=memory for single-process PoC)
+      SAGA_STATE_STORE: redis
+      REDIS_URL: redis://redis:6379
+      DATABASE_URL: postgresql://saga_user:saga_pass@postgres-saga:5432/saga_db
+      JAEGER_AGENT_HOST: jaeger
+    depends_on: [kafka, postgres-saga, redis, jaeger]
+
+  order-service:
+    build: ../services/order-service
+    ports:
+      - "3010:3000"
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://orders_user:orders_pass@postgres-orders:5432/orders_db
+    depends_on: [kafka, postgres-orders]
+
+  payment-service:
+    build: ../services/payment-service
+    ports:
+      - "3011:3000"
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://payments_user:payments_pass@postgres-payments:5432/payments_db
+    depends_on: [kafka, postgres-payments]
+
+  inventory-service:
+    build: ../services/inventory-service
+    ports:
+      - "3012:3000"
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      DATABASE_URL: postgresql://inventory_user:inventory_pass@postgres-inventory:5432/inventory_db
+    depends_on: [kafka, postgres-inventory]
+
+  notification-service:
+    build: ../services/notification-service
+    ports:
+      - "3013:3000"
+    environment:
+      KAFKA_BROKERS: kafka:9092
+    depends_on: [kafka]
+
+volumes:
+  saga_postgres_data:

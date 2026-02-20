@@ -1,0 +1,70 @@
+global:
+  imagePullPolicy: IfNotPresent
+
+config:
+  kafkaBrokers: "kafka:9092"
+  # orchestrator state store: redis | memory
+  sagaStateStore: "redis"
+  typeorm:
+    synchronize: "false"
+    logging: "false"
+
+secrets:
+  # ⚠️  DEMO VALUES ONLY — do NOT use real credentials here.
+  # In production, remove these values and use one of:
+  #   - ExternalSecrets Operator (https://external-secrets.io)
+  #   - Sealed Secrets (https://github.com/bitnami-labs/sealed-secrets)
+  #   - Your cloud provider's secret manager (AWS Secrets Manager, GCP Secret Manager, Azure Key Vault)
+  redisUrl: "redis://redis-master:6379"                                                              # ⚠️ demo only
+  orchestratorDatabaseUrl: "postgresql://saga_user:saga_pass@postgres-saga-postgresql:5432/saga_db" # ⚠️ demo only
+  ordersDatabaseUrl: "postgresql://orders_user:orders_pass@postgres-orders-postgresql:5432/orders_db"         # ⚠️ demo only
+  paymentsDatabaseUrl: "postgresql://payments_user:payments_pass@postgres-payments-postgresql:5432/payments_db" # ⚠️ demo only
+  inventoryDatabaseUrl: "postgresql://inventory_user:inventory_pass@postgres-inventory-postgresql:5432/inventory_db" # ⚠️ demo only
+
+images:
+  orchestrator:
+    repository: saga-orchestrator
+    tag: latest
+  order:
+    repository: order-service
+    tag: latest
+  payment:
+    repository: payment-service
+    tag: latest
+  inventory:
+    repository: inventory-service
+    tag: latest
+  notification:
+    repository: notification-service
+    tag: latest
+
+replicas:
+  orchestrator: 1
+  order: 1
+  payment: 1
+  inventory: 1
+  notification: 1
+
+resources: {}
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false
+  className: ""
+  hosts:
+    - host: saga.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 75
+
+pdb:
+  enabled: false
+  minAvailable: 1

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: saga-config
+data:
+  KAFKA_BROKERS: "kafka:9092"
+  SAGA_STATE_STORE: "redis"
+  TYPEORM_SYNCHRONIZE: "false"
+  TYPEORM_LOGGING: "false"
+  NODE_ENV: "production"
