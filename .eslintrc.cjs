@@ -17,15 +17,9 @@ module.exports = {
     "**/dist/**",
     "**/node_modules/**",
     "**/coverage/**",
-    "docker/**",
-    "docs/**",
-    "deploy/**",
   ],
   rules: {
-    // TypeScript projects should rely on tsc for undefined vars/types.
     "no-undef": "off",
-
-    // Start lenient; tighten to "error" once the codebase is clean.
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/no-unused-vars": [
       "warn",
