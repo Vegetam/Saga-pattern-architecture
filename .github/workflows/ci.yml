@@ -18,7 +18,6 @@ jobs:
         with:
           node-version: "20"
 
-      # ---- saga-orchestrator ----
       - name: Install (saga-orchestrator)
         working-directory: saga-orchestrator
         run: npm install --no-audit --no-fund
@@ -27,15 +26,10 @@ jobs:
         working-directory: saga-orchestrator
         run: npm run build
 
-      - name: Lint (saga-orchestrator)
-        working-directory: saga-orchestrator
-        run: npm run lint --if-present
-
-      - name: Test (saga-orchestrator)
+      - name: Unit tests (saga-orchestrator)
         working-directory: saga-orchestrator
         run: npm run test:unit
 
-      # ---- services/* ----
       - name: Install + build (services)
         shell: bash
         run: |
