@@ -7,8 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  node:
+  build_lint_test:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,16 +18,38 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
 
-      - name: Install
-        run: npm ci --no-audit --no-fund
+      # ---- saga-orchestrator ----
+      - name: Install (saga-orchestrator)
+        working-directory: saga-orchestrator
+        run: npm install --no-audit --no-fund
 
-      - name: Build (tsc)
-        run: npm run build --if-present
+      - name: Build (saga-orchestrator)
+        working-directory: saga-orchestrator
+        run: npm run build
+
+      - name: Unit tests (saga-orchestrator)
+        working-directory: saga-orchestrator
+        run: npm run test:unit
+
+      # ---- services/* ----
+      - name: Install + build (services)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for d in services/*; do
+            if [ -f "$d/package.json" ]; then
+              echo "==> $d"
+              (cd "$d" && npm install --no-audit --no-fund && npm run build)
+            fi
+          done
 
       - name: Lint (TypeScript)
-        run: npm run lint --if-present
-
-      - name: Test
-        run: npm test --if-present
+        run: |
+          npx -y \
+            -p eslint@8 \
+            -p @typescript-eslint/parser@6 \
+            -p @typescript-eslint/eslint-plugin@6 \
+            eslint -c .eslintrc.cjs \
+            "saga-orchestrator/src/**/*.ts" \
+            "services/*/src/**/*.ts"
