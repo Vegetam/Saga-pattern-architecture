@@ -12,12 +12,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+          cache-dependency-path: saga-orchestrator/package-lock.json
 
       # ---- saga-orchestrator ----
       - name: Install (saga-orchestrator)
@@ -27,6 +29,10 @@ jobs:
       - name: Build (saga-orchestrator)
         working-directory: saga-orchestrator
         run: npm run build
+
+      - name: Lint (saga-orchestrator)
+        working-directory: saga-orchestrator
+        run: npx eslint -c ../.eslintrc.cjs "src/**/*.ts"
 
       - name: Unit tests (saga-orchestrator)
         working-directory: saga-orchestrator
@@ -43,13 +49,3 @@ jobs:
               (cd "$d" && npm install --no-audit --no-fund && npm run build)
             fi
           done
-
-      - name: Lint (TypeScript)
-        run: |
-          npx -y \
-            -p eslint@8 \
-            -p @typescript-eslint/parser@6 \
-            -p @typescript-eslint/eslint-plugin@6 \
-            eslint -c .eslintrc.cjs \
-            "saga-orchestrator/src/**/*.ts" \
-            "services/*/src/**/*.ts"
