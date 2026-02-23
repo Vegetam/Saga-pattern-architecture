@@ -7,9 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  build_lint_test:
+  node:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -30,9 +29,9 @@ jobs:
 
       - name: Lint (saga-orchestrator)
         working-directory: saga-orchestrator
-        run: npx eslint -c ../.eslintrc.cjs "src/**/*.ts"
+        run: npm run lint --if-present
 
-      - name: Unit tests (saga-orchestrator)
+      - name: Test (saga-orchestrator)
         working-directory: saga-orchestrator
         run: npm run test:unit
 
