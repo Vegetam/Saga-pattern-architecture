@@ -1,5 +1,8 @@
 # 🔄 Saga Pattern Architecture — Distributed Transaction Management
 
+[![CI](https://github.com/Vegetam/Saga-pattern-architecture/actions/workflows/ci.yml/badge.svg)](https://github.com/Vegetam/Saga-pattern-architecture/actions/workflows/ci.yml)
+![License](https://img.shields.io/github/license/Vegetam/Saga-pattern-architecture)
+
 > **Production-grade Saga Orchestration Pattern** for managing distributed transactions across microservices with full compensation logic, idempotency, and observability.
 
 ![Architecture](docs/saga-flow.svg)
